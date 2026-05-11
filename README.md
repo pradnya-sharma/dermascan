@@ -13,7 +13,7 @@ The system integrates:
 
 ---
 
-## 🚀 Features
+## Features
 
 ### Digital Image Processing Pipeline
 - Morphological black-hat hair removal
@@ -47,13 +47,13 @@ The system integrates:
 
 ---
 
-# 🧠 System Architecture
+# System Architecture
 
 ![Architecture](screenshots/architecture.png)
 
 ---
 
-# 🖥️ Demo
+# Demo
 
 ## Input Upload
 ![Upload](screenshots/upload.png)
@@ -66,7 +66,7 @@ The system integrates:
 
 ---
 
-# 📊 Experimental Results
+# Experimental Results
 
 | Model | Accuracy | AUC |
 |---|---|---|
@@ -82,7 +82,7 @@ The system integrates:
 
 ---
 
-# ⚡ Performance
+# Performance
 
 | Metric | Value |
 |---|---|
@@ -93,7 +93,7 @@ The system integrates:
 
 ---
 
-# 🛠️ Tech Stack
+# Tech Stack
 
 ## Frontend
 - HTML/CSS/JavaScript
@@ -112,7 +112,7 @@ The system integrates:
 
 ---
 
-# 📂 Project Structure
+# Project Structure
 
 ```bash
 dermascan/
@@ -131,7 +131,7 @@ dermascan/
 
 ---
 
-# 🐳 Running Locally
+# Running Locally
 
 ## Clone Repository
 
@@ -159,7 +159,7 @@ http://127.0.0.1:5000
 
 ---
 
-# ☁️ Azure Deployment
+# Azure Deployment
 
 This project is containerized using Docker and deployable on:
 - Azure App Service
@@ -168,7 +168,7 @@ This project is containerized using Docker and deployable on:
 
 ---
 
-# 📚 Dataset
+# Dataset
 
 - ISIC Dermoscopy Archive
 - Stratified subset (~3200 images)
@@ -176,7 +176,7 @@ This project is containerized using Docker and deployable on:
 
 ---
 
-# ⚠️ Limitations
+# Limitations
 
 - Moderate dataset size
 - Otsu segmentation struggles under uneven illumination
@@ -185,7 +185,7 @@ This project is containerized using Docker and deployable on:
 
 ---
 
-# 🔮 Future Work
+# Future Work
 
 - Transformer-based segmentation (TransUNet / Swin-UNet)
 - Expanded ISIC 2019/2020 training
@@ -195,7 +195,7 @@ This project is containerized using Docker and deployable on:
 
 ---
 
-# 📄 Research Paper
+# Research Paper
 
 Full project paper included in repository:
 - `DermaScan.pdf`
