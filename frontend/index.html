@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>DermaScan — Lesion Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root {
+  --paper:  #f5f0e8;
+  --paper2: #ede7d9;
+  --paper3: #e0d8c8;
+  --ink:    #1a1612;
+  --ink2:   #3d352b;
+  --ink3:   #6b5e4e;
+  --ink4:   #9c8c79;
+  --terra:  #c4633a;
+  --terra2: #a04e2c;
+  --terra3: #7a3a1e;
+  --forest: #2d5a3d;
+  --forest2:#1e3d2a;
+  --gold:   #b8922a;
+  --gold2:  #8a6b1a;
+  --cream:  #faf7f2;
+  --r: 4px;
+  --font-serif: 'Cormorant Garamond', Georgia, serif;
+  --font-mono:  'Space Mono', monospace;
+  --font-ui:    'Instrument Sans', sans-serif;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  min-height: 100vh;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* Halftone dot texture */
+body::before {
+  content:'';
+  position:fixed;inset:0;
+  background-image: radial-gradient(circle, rgba(26,22,18,0.06) 1px, transparent 1px);
+  background-size: 20px 20px;
+  pointer-events:none;
+  z-index:0;
+}
+
+/* Decorative corner — top right */
+.corner-tl, .corner-br {
+  position:fixed;
+  width:50px;height:50px;
+  pointer-events:none;z-index:1;opacity:0.35;
+}
+.corner-tl { top:20px;right:20px; border-top:1.5px solid var(--terra); border-right:1.5px solid var(--terra); }
+.corner-br { bottom:20px;left:20px; border-bottom:1.5px solid var(--terra); border-left:1.5px solid var(--terra); }
+
+.page {
+  position:relative;z-index:2;
+  max-width:1020px;
+  margin:0 auto;
+  padding:0 40px 80px;
+}
+
+/* ── Header ── */
+header {
+  padding:52px 0 40px;
+  border-bottom:1px solid rgba(26,22,18,0.1);
+  margin-bottom:52px;
+  display:grid;
+  grid-template-columns:1fr auto;
+  align-items:end;
+  gap:32px;
+}
+
+.eyebrow {
+  font-family:var(--font-mono);
+  font-size:11px;
+  font-weight:700;
+  letter-spacing:0.15em;
+  color:var(--terra);
+  text-transform:uppercase;
+  margin-bottom:12px;
+  display:flex;align-items:center;gap:10px;
+}
+.eyebrow-line { width:28px;height:2px;background:var(--terra);display:inline-block; }
+
+h1 {
+  font-family:var(--font-serif);
+  font-size:clamp(42px,6vw,70px);
+  font-weight:300;
+  letter-spacing:-0.02em;
+  line-height:0.93;
+  color:var(--ink);
+}
+h1 em { font-style:italic; color:var(--terra); }
+
+.header-sub {
+  margin-top:16px;
+  font-size:13px;
+  color:var(--ink3);
+  line-height:1.65;
+  max-width:440px;
+}
+
+.header-meta {
+  display:flex;flex-direction:column;align-items:flex-end;gap:8px;padding-bottom:6px;
+}
+.meta-pill {
+  font-family:var(--font-mono);font-size:10px;
+  font-weight:700;
+  letter-spacing:0.1em;text-transform:uppercase;
+  color:var(--ink2);
+  border:1.5px solid var(--paper3);
+  padding:6px 14px;border-radius:2px;
+  background:var(--cream);
+}
+
+/* ── Section label ── */
+.sec-label {
+  font-family:var(--font-mono);font-size:11px;
+  font-weight:700;
+  letter-spacing:0.16em;text-transform:uppercase;
+  color:var(--ink2);margin-bottom:20px;
+  display:flex;align-items:center;gap:12px;
+}
+.sec-num { color:var(--terra);min-width:18px; }
+.sec-label::after { content:'';flex:1;height:1px;background:linear-gradient(90deg,rgba(26,22,18,0.15),transparent); }
+
+/* ── Upload ── */
+.upload-wrap { margin-bottom:52px; }
+
+.dropzone {
+  border:1.5px solid var(--paper3);
+  border-radius:var(--r);
+  background:var(--cream);
+  min-height:270px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;
+  cursor:pointer;
+  position:relative;overflow:hidden;
+  transition:border-color 0.3s, background 0.25s;
+}
+/* Crosshair corners */
+.dropzone .cTL,.dropzone .cBR { position:absolute;width:22px;height:22px;pointer-events:none; }
+.dropzone .cTL { top:14px;left:14px;border-top:1.5px solid var(--terra);border-left:1.5px solid var(--terra);opacity:0.45; }
+.dropzone .cBR { bottom:14px;right:14px;border-bottom:1.5px solid var(--terra);border-right:1.5px solid var(--terra);opacity:0.45; }
+.dropzone:hover,.dropzone.drag-over { border-color:var(--terra);background:#fcf9f4; }
+
+/* Spinning scope */
+.scope-ring {
+  width:112px;height:112px;flex-shrink:0;
+  animation:slow-turn 18s linear infinite;
+}
+@keyframes slow-turn{100%{transform:rotate(360deg)}}
+
+.drop-title { font-family:var(--font-serif);font-size:23px;font-weight:300;color:var(--ink);text-align:center; }
+.drop-hint  { font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink3); }
+
+.prev-wrap { width:100%;position:relative; }
+.prev-wrap img { width:100%;height:280px;object-fit:contain;padding:20px;display:block; }
+.prev-tag {
+  position:absolute;bottom:14px;left:50%;transform:translateX(-50%);
+  background:rgba(250,247,242,0.92);border:1px solid var(--paper3);border-radius:2px;
+  padding:5px 14px;font-family:var(--font-mono);font-size:10px;color:var(--ink3);white-space:nowrap;
+  backdrop-filter:blur(4px);
+}
+
+/* ── Buttons ── */
+.action-row { display:flex;gap:12px;margin-top:16px; }
+.btn {
+  font-family:var(--font-ui);font-weight:600;font-size:13px;
+  border:none;cursor:pointer;border-radius:2px;
+  padding:14px 30px;letter-spacing:0.03em;
+  transition:all 0.2s;display:flex;align-items:center;gap:10px;
+}
+.btn-primary { background:var(--terra);color:#fff;flex:1;justify-content:center; }
+.btn-primary:hover:not(:disabled) { background:var(--terra2);transform:translateY(-1px);box-shadow:0 6px 20px rgba(196,99,58,0.28); }
+.btn-primary:disabled { opacity:0.38;cursor:not-allowed; }
+.btn-ghost { background:transparent;color:var(--ink3);border:1px solid var(--paper3); }
+.btn-ghost:hover { background:var(--paper2);color:var(--ink2); }
+.spin-sm { width:14px;height:14px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 0.7s linear infinite;flex-shrink:0; }
+@keyframes spin{100%{transform:rotate(360deg)}}
+
+/* ── Error ── */
+.err-bar {
+  display:none;margin-top:14px;
+  background:#fdf2ee;border:1px solid rgba(196,99,58,0.25);border-left:3px solid var(--terra);
+  border-radius:var(--r);padding:13px 18px;
+  font-family:var(--font-mono);font-size:10px;color:var(--terra2);line-height:1.6;
+}
+
+/* ── Loader ── */
+.loader-wrap { display:none;margin-bottom:52px; }
+.loader-inner { display:flex;gap:52px;align-items:flex-start;flex-wrap:wrap; }
+
+.loader-scope-wrap {
+  flex-shrink:0;position:relative;width:144px;height:144px;
+}
+.loader-scope-wrap svg { width:144px;height:144px; }
+.ls-spin { animation:spin 2.5s linear infinite;transform-origin:72px 72px; }
+.ls-pulse { animation:ls-pulse 2s ease-in-out infinite; }
+@keyframes ls-pulse{0%,100%{r:16;opacity:0.25}50%{r:22;opacity:0.7}}
+.loader-lbl {
+  position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:3px;
+  font-family:var(--font-mono);font-size:9px;color:var(--terra);
+  letter-spacing:0.1em;text-align:center;
+}
+.loader-lbl .big { font-family:var(--font-serif);font-size:22px;line-height:1; }
+
+.steps-list { flex:1;display:flex;flex-direction:column;gap:0; }
+.lstep {
+  display:flex;align-items:center;gap:16px;
+  padding:11px 0;border-bottom:1px solid var(--paper2);
+  opacity:0.28;transition:opacity 0.4s;
+}
+.lstep:last-child{border-bottom:none}
+.lstep.active{opacity:1}
+.lstep.done{opacity:0.55}
+.lstep-tick {
+  width:22px;height:22px;flex-shrink:0;
+  border:1px solid var(--paper3);border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--font-mono);font-size:9px;color:var(--ink4);
+  transition:all 0.3s;
+}
+.lstep.active .lstep-tick { border-color:var(--terra);background:var(--terra);color:#fff; }
+.lstep.done  .lstep-tick  { border-color:var(--forest);background:var(--forest);color:#fff; }
+.lstep-txt { font-family:var(--font-mono);font-size:10px;color:var(--ink2);letter-spacing:0.04em;flex:1; }
+.lstep-cat { font-family:var(--font-mono);font-size:10px;font-weight:700;color:var(--ink3);letter-spacing:0.1em;text-transform:uppercase; }
+
+/* ── Results ── */
+.results-wrap { display:none;animation:rise 0.6s cubic-bezier(0.16,1,0.3,1); }
+@keyframes rise{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+
+/* Verdict */
+.verdict-grid { display:grid;grid-template-columns:1fr 160px;gap:16px;margin-bottom:52px;align-items:stretch; }
+.verdict-main {
+  border-radius:var(--r);padding:32px 36px;
+  position:relative;overflow:hidden;
+}
+.verdict-main::after {
+  content:'';position:absolute;top:-50px;right:-50px;
+  width:180px;height:180px;border-radius:50%;
+  border:1px solid currentColor;opacity:0.08;
+}
+.verd-bad { background:#fdf2ee;border:1px solid rgba(196,99,58,0.35);color:var(--terra); }
+.verd-good{ background:#f0f5f1;border:1px solid rgba(45,90,61,0.25);color:var(--forest); }
+
+.verd-eyebrow { font-family:var(--font-mono);font-size:9px;letter-spacing:0.18em;text-transform:uppercase;opacity:0.6;margin-bottom:12px; }
+.verd-heading { font-family:var(--font-serif);font-size:clamp(30px,4vw,48px);font-weight:300;line-height:1;margin-bottom:10px; }
+.verd-class   { font-family:var(--font-mono);font-size:10px;letter-spacing:0.08em;color:var(--ink3); }
+
+.conf-panel {
+  background:var(--cream);border:1px solid var(--paper3);border-radius:var(--r);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:20px;
+}
+.conf-dial { width:90px;height:90px;position:relative; }
+.conf-dial svg { width:90px;height:90px;transform:rotate(-90deg); }
+.c-tr { stroke:var(--paper3);fill:none;stroke-width:5; }
+.c-fi { fill:none;stroke-width:5;stroke-linecap:round;transition:stroke-dasharray 1.2s cubic-bezier(0.16,1,0.3,1); }
+.conf-inner {
+  position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-family:var(--font-serif);font-size:22px;color:var(--ink);
+}
+.conf-inner small { font-family:var(--font-mono);font-size:8px;color:var(--ink4);letter-spacing:0.1em; }
+.conf-lbl { font-family:var(--font-mono);font-size:9px;color:var(--ink4);letter-spacing:0.12em;text-transform:uppercase; }
+
+/* Image panels */
+.img-row { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-bottom:52px; }
+.img-tile {
+  border-radius:var(--r);overflow:hidden;
+  border:1px solid var(--paper3);background:var(--cream);
+  transition:transform 0.25s,box-shadow 0.25s;
+}
+.img-tile:hover { transform:translateY(-3px);box-shadow:0 10px 28px rgba(26,22,18,0.1); }
+.img-viewport {
+  position:relative;aspect-ratio:1;overflow:hidden;
+}
+.img-viewport img { width:100%;height:100%;object-fit:cover;display:block;transition:transform 0.4s; }
+.img-tile:hover .img-viewport img { transform:scale(1.04); }
+/* Radial vignette → scope feel */
+.img-viewport::after {
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(circle at 50% 50%,transparent 42%,rgba(245,240,232,0.45) 72%);
+  pointer-events:none;
+}
+.img-foot {
+  padding:12px 16px;border-top:1px solid var(--paper3);
+  display:flex;align-items:center;gap:10px;
+}
+.img-foot-n    { font-family:var(--font-mono);font-size:10px;font-weight:700;color:var(--terra);min-width:18px; }
+.img-foot-name { font-family:var(--font-mono);font-size:10px;font-weight:700;color:var(--ink2);letter-spacing:0.05em;flex:1; }
+.img-foot-dot  { width:6px;height:6px;border-radius:50%;flex-shrink:0; }
+
+/* Pipeline */
+.pipeline-box {
+  background:var(--cream);border:1px solid var(--paper3);border-radius:var(--r);
+  overflow:hidden;margin-bottom:52px;
+}
+.pipe-row {
+  display:flex;align-items:center;gap:18px;padding:16px 22px;
+  border-bottom:1px solid var(--paper2);transition:background 0.2s;
+}
+.pipe-row:last-child{border-bottom:none}
+.pipe-row:hover{background:var(--paper2);}
+.pipe-n    { font-family:var(--font-mono);font-size:10px;color:var(--terra);opacity:0.6;width:22px;text-align:right;flex-shrink:0; }
+.pipe-ico  { width:34px;height:34px;border-radius:50%;border:1px solid var(--paper3);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;background:var(--paper); }
+.pipe-inf  { flex:1; }
+.pipe-name { font-weight:600;font-size:13px;color:var(--ink2); }
+.pipe-desc { font-size:11px;color:var(--ink4);margin-top:2px;line-height:1.4; }
+.pipe-tag  { font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;padding:4px 10px;border-radius:2px;flex-shrink:0; }
+
+/* ABCD */
+.abcd-grid { display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:52px; }
+.abcd-tile {
+  background:var(--cream);border:1px solid var(--paper3);border-radius:var(--r);
+  padding:20px 18px 16px;position:relative;overflow:hidden;
+  transition:border-color 0.2s,transform 0.2s;
+}
+.abcd-tile:hover { border-color:var(--terra);transform:translateY(-2px); }
+.ghost-letter {
+  position:absolute;bottom:-10px;right:8px;
+  font-family:var(--font-serif);font-style:italic;
+  font-size:76px;font-weight:600;
+  color:rgba(196,99,58,0.22);line-height:1;pointer-events:none;user-select:none;
+  transition:color 0.3s;
+  -webkit-text-stroke: 1px rgba(196,99,58,0.18);
+}
+.abcd-tile:hover .ghost-letter { color:rgba(196,99,58,0.38); -webkit-text-stroke: 1px rgba(196,99,58,0.3); }
+.abcd-lbl  { font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink2);margin-bottom:10px; }
+.abcd-name { font-family:var(--font-serif);font-size:14px;font-weight:400;color:var(--ink2);margin-bottom:8px;line-height:1.3; }
+.abcd-val  { font-family:var(--font-serif);font-size:30px;font-weight:300;color:var(--ink);line-height:1; }
+.abcd-unit { font-family:var(--font-mono);font-size:9px;color:var(--ink4);margin-top:4px; }
+
+/* Features */
+.feat-grid { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:52px; }
+.feat-tile {
+  background:var(--cream);border:1px solid var(--paper3);border-radius:var(--r);
+  padding:18px 20px;transition:border-color 0.2s;
+}
+.feat-tile:hover{border-color:var(--gold)}
+.feat-lbl  { font-family:var(--font-mono);font-size:10px;font-weight:700;color:var(--ink2);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px; }
+.feat-val  { font-family:var(--font-serif);font-size:28px;font-weight:300;color:var(--ink);line-height:1; }
+.feat-unit { font-family:var(--font-mono);font-size:9px;color:var(--ink4);margin-top:4px; }
+.feat-bar  { height:2px;background:var(--paper3);border-radius:1px;margin-top:14px;overflow:hidden; }
+.feat-fill { height:100%;border-radius:1px;background:var(--gold);transition:width 1.3s cubic-bezier(0.16,1,0.3,1); }
+
+/* Model comparison */
+.model-grid { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:52px; }
+.model-tile {
+  border:1px solid var(--paper3);border-radius:var(--r);
+  background:var(--cream);padding:24px 20px;text-align:center;
+  position:relative;overflow:hidden;transition:transform 0.2s;
+}
+.model-tile::before { content:'';position:absolute;top:0;left:0;right:0;height:2px;background:transparent;transition:background 0.3s; }
+.model-tile.winner { border-color:rgba(184,146,42,0.35); }
+.model-tile.winner::before { background:var(--gold); }
+.model-tile:hover { transform:translateY(-2px); }
+.model-type { font-family:var(--font-mono);font-size:10px;font-weight:700;color:var(--ink2);letter-spacing:0.12em;text-transform:uppercase;margin-bottom:14px; }
+.model-num  { font-family:var(--font-serif);font-size:38px;font-weight:300;color:var(--ink);line-height:1; }
+.model-sub  { font-family:var(--font-mono);font-size:9px;color:var(--ink4);margin-top:6px; }
+.model-bdg  {
+  display:inline-block;margin-top:12px;
+  font-family:var(--font-mono);font-size:9px;letter-spacing:0.1em;text-transform:uppercase;
+  padding:4px 12px;border-radius:2px;
+  background:rgba(184,146,42,0.1);color:var(--gold2);
+}
+
+/* Disclaimer */
+.disclaimer {
+  background:rgba(184,146,42,0.05);
+  border:1px solid rgba(184,146,42,0.2);border-left:3px solid var(--gold);
+  border-radius:var(--r);padding:16px 20px;
+  font-family:var(--font-mono);font-size:10px;color:var(--gold2);line-height:1.7;
+  margin-bottom:52px;display:flex;gap:12px;align-items:flex-start;
+}
+
+/* Footer */
+footer {
+  border-top:1px solid rgba(26,22,18,0.08);padding-top:24px;
+  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;
+}
+footer p { font-family:var(--font-mono);font-size:9px;color:var(--ink4);letter-spacing:0.08em; }
+
+/* Responsive */
+@media(max-width:720px){
+  .page{padding:0 20px 60px}
+  header{grid-template-columns:1fr}
+  .verdict-grid{grid-template-columns:1fr}
+  .abcd-grid{grid-template-columns:repeat(2,1fr)}
+  .img-row{grid-template-columns:1fr}
+  .feat-grid{grid-template-columns:repeat(2,1fr)}
+  .model-grid{grid-template-columns:1fr}
+}
+@media(max-width:440px){
+  .abcd-grid{grid-template-columns:1fr}
+  .feat-grid{grid-template-columns:1fr}
+}
+
+input[type=file]{display:none}
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--paper3);border-radius:3px}
+</style>
+</head>
+<body>
+
+<div class="corner-tl"></div>
+<div class="corner-br"></div>
+
+<div class="page">
+
+<!-- ── Header ── -->
+<header>
+  <div>
+    <div class="eyebrow"><span class="eyebrow-line"></span>Digital Image Processing · Deep Learning</div>
+    <h1>Derma<em>Scan</em></h1>
+    <p class="header-sub">Clinical-grade skin lesion analysis combining DIP feature extraction — ABCD rule, GLCM, LBP, FFT — with a ResNet18 + ViT hybrid classifier and Grad-CAM visualisation.</p>
+  </div>
+  <div class="header-meta">
+    <div class="meta-pill">ABCD · GLCM · LBP · FFT</div>
+    <div class="meta-pill">ResNet18 + ViT Hybrid</div>
+    <div class="meta-pill" style="color:var(--terra);border-color:rgba(196,99,58,0.2);">v2.0 — full dip pipeline</div>
+  </div>
+</header>
+
+<!-- ── Upload ── -->
+<div class="upload-wrap">
+  <div class="sec-label"><span class="sec-num">01</span>dermoscopic image input</div>
+
+  <div class="dropzone" id="dropzone"
+    ondrop="handleDrop(event)"
+    ondragover="dz(event,true)"
+    ondragleave="dz(event,false)"
+    onclick="document.getElementById('fi').click()">
+    <div class="cTL"></div>
+    <div class="cBR"></div>
+
+    <div id="dropInner" style="display:flex;flex-direction:column;align-items:center;gap:20px;">
+      <!-- Animated microscope scope ring -->
+      <svg class="scope-ring" viewBox="0 0 112 112" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="56" cy="56" r="52" stroke="rgba(196,99,58,0.15)" stroke-width="1"/>
+        <circle cx="56" cy="56" r="46" stroke="var(--terra)" stroke-width="0.8" stroke-dasharray="4 7" opacity="0.4"/>
+        <line x1="56" y1="4"   x2="56" y2="20"  stroke="var(--terra)" stroke-width="1" opacity="0.5"/>
+        <line x1="56" y1="92"  x2="56" y2="108" stroke="var(--terra)" stroke-width="1" opacity="0.5"/>
+        <line x1="4"  y1="56"  x2="20" y2="56"  stroke="var(--terra)" stroke-width="1" opacity="0.5"/>
+        <line x1="92" y1="56"  x2="108" y2="56" stroke="var(--terra)" stroke-width="1" opacity="0.5"/>
+        <circle cx="56" cy="56" r="28" stroke="rgba(196,99,58,0.12)" stroke-width="1"/>
+        <circle cx="56" cy="56" r="3"  fill="var(--terra)" opacity="0.35"/>
+        <line x1="22" y1="22" x2="29" y2="29" stroke="var(--terra)" stroke-width="1" opacity="0.35"/>
+        <line x1="90" y1="22" x2="83" y2="29" stroke="var(--terra)" stroke-width="1" opacity="0.35"/>
+        <line x1="22" y1="90" x2="29" y2="83" stroke="var(--terra)" stroke-width="1" opacity="0.35"/>
+        <line x1="90" y1="90" x2="83" y2="83" stroke="var(--terra)" stroke-width="1" opacity="0.35"/>
+      </svg>
+      <div style="text-align:center">
+        <div class="drop-title">Drop your dermoscopic image</div>
+        <div class="drop-hint" style="margin-top:6px">click to browse · PNG · JPG · TIFF</div>
+      </div>
+    </div>
+
+    <input id="fi" type="file" accept="image/*" onchange="selectFile(this.files[0])"/>
+  </div>
+
+  <div class="action-row">
+    <button class="btn btn-primary" id="analyzeBtn" onclick="analyze()" disabled>
+      <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+        <circle cx="7.5" cy="7.5" r="6" stroke="currentColor" stroke-width="1.5"/>
+        <path d="M5 7.5l2 2 3-3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Run Full DIP Analysis
+    </button>
+    <button class="btn btn-ghost" onclick="resetAll()">Reset</button>
+  </div>
+
+  <div class="err-bar" id="errBar"></div>
+</div>
+
+<!-- ── Loader ── -->
+<div class="loader-wrap" id="loaderWrap">
+  <div class="sec-label"><span class="sec-num">—</span>processing pipeline</div>
+  <div class="loader-inner">
+    <div class="loader-scope-wrap">
+      <svg viewBox="0 0 144 144" fill="none">
+        <circle cx="72" cy="72" r="66" stroke="var(--paper3)" stroke-width="1"/>
+        <circle cx="72" cy="72" r="66" stroke="var(--terra)" stroke-width="1.5"
+                stroke-dasharray="90 325" stroke-linecap="round" class="ls-spin"/>
+        <circle cx="72" cy="72" r="50" stroke="rgba(196,99,58,0.12)" stroke-width="1"/>
+        <circle cx="72" cy="72" r="34" stroke="rgba(196,99,58,0.18)" stroke-width="1" stroke-dasharray="3 6"/>
+        <line x1="72" y1="6"   x2="72" y2="22"  stroke="var(--terra)" stroke-width="1" opacity="0.4"/>
+        <line x1="72" y1="122" x2="72" y2="138" stroke="var(--terra)" stroke-width="1" opacity="0.4"/>
+        <line x1="6"  y1="72"  x2="22" y2="72"  stroke="var(--terra)" stroke-width="1" opacity="0.4"/>
+        <line x1="122" y1="72" x2="138" y2="72" stroke="var(--terra)" stroke-width="1" opacity="0.4"/>
+        <circle cx="72" cy="72" r="8" fill="none" stroke="rgba(196,99,58,0.25)" stroke-width="1" class="ls-pulse"/>
+      </svg>
+      <div class="loader-lbl">
+        <span class="big" id="loaderPct">0%</span>
+        <span>analysing</span>
+      </div>
+    </div>
+    <div class="steps-list">
+      <div class="lstep" id="ls0"><div class="lstep-tick">1</div><span class="lstep-txt">Hair removal — DullRazor black-hat filter</span><span class="lstep-cat">spatial</span></div>
+      <div class="lstep" id="ls1"><div class="lstep-tick">2</div><span class="lstep-txt">CLAHE contrast enhancement (L* channel)</span><span class="lstep-cat">histogram</span></div>
+      <div class="lstep" id="ls2"><div class="lstep-tick">3</div><span class="lstep-txt">Otsu threshold + morphological cleanup</span><span class="lstep-cat">segment</span></div>
+      <div class="lstep" id="ls3"><div class="lstep-tick">4</div><span class="lstep-txt">Canny edge detection on lesion boundary</span><span class="lstep-cat">edges</span></div>
+      <div class="lstep" id="ls4"><div class="lstep-tick">5</div><span class="lstep-txt">ABCD feature extraction</span><span class="lstep-cat">features</span></div>
+      <div class="lstep" id="ls5"><div class="lstep-tick">6</div><span class="lstep-txt">GLCM + LBP texture analysis</span><span class="lstep-cat">texture</span></div>
+      <div class="lstep" id="ls6"><div class="lstep-tick">7</div><span class="lstep-txt">FFT frequency domain features</span><span class="lstep-cat">frequency</span></div>
+      <div class="lstep" id="ls7"><div class="lstep-tick">8</div><span class="lstep-txt">SVM · RF · Hybrid DL inference</span><span class="lstep-cat">classify</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Results ── -->
+<div class="results-wrap" id="resultsWrap">
+
+  <!-- Verdict -->
+  <div class="sec-label"><span class="sec-num">02</span>diagnosis verdict</div>
+  <div class="verdict-grid">
+    <div class="verdict-main" id="verdMain">
+      <div class="verd-eyebrow" id="verdEyebrow">classification result</div>
+      <div class="verd-heading" id="verdHeading">—</div>
+      <div class="verd-class"   id="verdClass">—</div>
+    </div>
+    <div class="conf-panel">
+      <div class="conf-dial">
+        <svg viewBox="0 0 90 90">
+          <circle class="c-tr" cx="45" cy="45" r="36"/>
+          <circle class="c-fi" id="cFill" cx="45" cy="45" r="36" stroke="var(--terra)" stroke-dasharray="0 226"/>
+        </svg>
+        <div class="conf-inner">
+          <span id="confNum">—</span>
+          <small>conf.</small>
+        </div>
+      </div>
+      <div class="conf-lbl">confidence</div>
+    </div>
+  </div>
+
+  <!-- Images -->
+  <div class="sec-label"><span class="sec-num">03</span>visual analysis</div>
+  <div class="img-row" id="imgRow"></div>
+
+  <!-- Pipeline -->
+  <div class="sec-label"><span class="sec-num">04</span>dip processing pipeline</div>
+  <div class="pipeline-box">
+    <div class="pipe-row">
+      <span class="pipe-n">01</span><div class="pipe-ico">🪮</div>
+      <div class="pipe-inf">
+        <div class="pipe-name">Hair Removal</div>
+        <div class="pipe-desc">Black-hat morphological transform detects hair pixels; TELEA inpainting reconstructs underlying skin texture</div>
+      </div>
+      <span class="pipe-tag" style="background:rgba(196,99,58,0.08);color:var(--terra2)">spatial</span>
+    </div>
+    <div class="pipe-row">
+      <span class="pipe-n">02</span><div class="pipe-ico" style="font-size:11px">▧</div>
+      <div class="pipe-inf">
+        <div class="pipe-name">CLAHE Enhancement</div>
+        <div class="pipe-desc">Contrast Limited Adaptive Histogram Equalisation on L* channel in CIELAB colour space</div>
+      </div>
+      <span class="pipe-tag" style="background:rgba(45,90,61,0.08);color:var(--forest2)">histogram</span>
+    </div>
+    <div class="pipe-row">
+      <span class="pipe-n">03</span><div class="pipe-ico" style="font-size:11px">◐</div>
+      <div class="pipe-inf">
+        <div class="pipe-name">Otsu Segmentation + Morphology</div>
+        <div class="pipe-desc">Global adaptive threshold with elliptical close/open kernels and largest connected component isolation</div>
+      </div>
+      <span class="pipe-tag" style="background:rgba(184,146,42,0.08);color:var(--gold2)">segment</span>
+    </div>
+    <div class="pipe-row">
+      <span class="pipe-n">04</span><div class="pipe-ico">∿</div>
+      <div class="pipe-inf">
+        <div class="pipe-name">Canny Edge Detection</div>
+        <div class="pipe-desc">Multi-stage edge detection on segmentation mask for Border Irregularity (ABCD-B criterion)</div>
+      </div>
+      <span class="pipe-tag" style="background:rgba(196,99,58,0.08);color:var(--terra2)">edges</span>
+    </div>
+    <div class="pipe-row">
+      <span class="pipe-n">05</span><div class="pipe-ico" style="font-size:11px">⊞</div>
+      <div class="pipe-inf">
+        <div class="pipe-name">GLCM + LBP Texture</div>
+        <div class="pipe-desc">Gray-Level Co-occurrence Matrix (contrast, energy, homogeneity) and Local Binary Patterns on lesion region</div>
+      </div>
+      <span class="pipe-tag" style="background:rgba(45,90,61,0.08);color:var(--forest2)">texture</span>
+    </div>
+    <div class="pipe-row">
+      <span class="pipe-n">06</span><div class="pipe-ico">〜</div>
+      <div class="pipe-inf">
+        <div class="pipe-name">FFT Frequency Domain</div>
+        <div class="pipe-desc">2D Fast Fourier Transform magnitude spectrum — low/high energy ratio encodes surface roughness</div>
+      </div>
+      <span class="pipe-tag" style="background:rgba(184,146,42,0.08);color:var(--gold2)">frequency</span>
+    </div>
+  </div>
+
+  <!-- ABCD -->
+  <div class="sec-label"><span class="sec-num">05</span>abcd clinical criteria</div>
+  <div class="abcd-grid">
+    <div class="abcd-tile">
+      <div class="ghost-letter">A</div>
+      <div class="abcd-lbl">A · Asymmetry</div>
+      <div class="abcd-name">Flip-overlap<br>ratio</div>
+      <div class="abcd-val" id="abcdA">—</div>
+      <div class="abcd-unit">lower = more symmetric</div>
+    </div>
+    <div class="abcd-tile">
+      <div class="ghost-letter">B</div>
+      <div class="abcd-lbl">B · Border</div>
+      <div class="abcd-name">Compactness<br>index</div>
+      <div class="abcd-val" id="abcdB">—</div>
+      <div class="abcd-unit">circle = 1.0</div>
+    </div>
+    <div class="abcd-tile">
+      <div class="ghost-letter">C</div>
+      <div class="abcd-lbl">C · Colour</div>
+      <div class="abcd-name">Hue standard<br>deviation</div>
+      <div class="abcd-val" id="abcdC">—</div>
+      <div class="abcd-unit">HSV channel σ</div>
+    </div>
+    <div class="abcd-tile">
+      <div class="ghost-letter">D</div>
+      <div class="abcd-lbl">D · Diameter</div>
+      <div class="abcd-name">Lesion area<br>in pixels</div>
+      <div class="abcd-val" id="abcdD">—</div>
+      <div class="abcd-unit">connected region</div>
+    </div>
+  </div>
+
+  <!-- Features -->
+  <div class="sec-label"><span class="sec-num">06</span>extracted dip features</div>
+  <div class="feat-grid" id="featGrid"></div>
+
+  <!-- Models -->
+  <div class="sec-label"><span class="sec-num">07</span>classifier comparison</div>
+  <div class="model-grid">
+    <div class="model-tile" id="svmTile">
+      <div class="model-type">SVM · DIP features only</div>
+      <div class="model-num" id="svmNum">—</div>
+      <div class="model-sub">support vector machine</div>
+    </div>
+    <div class="model-tile" id="rfTile">
+      <div class="model-type">Random Forest · DIP</div>
+      <div class="model-num" id="rfNum">—</div>
+      <div class="model-sub">ensemble classifier</div>
+    </div>
+    <div class="model-tile" id="dlTile">
+      <div class="model-type">Hybrid DL · ResNet18 + ViT</div>
+      <div class="model-num" id="dlNum">—</div>
+      <div class="model-sub">deep learning</div>
+    </div>
+  </div>
+
+  <!-- Disclaimer -->
+  <div class="disclaimer">
+    <span style="flex-shrink:0;margin-top:1px">⚠</span>
+    <span>For academic demonstration only. This tool does not provide clinical medical advice. Results must not be used to diagnose or treat any skin condition. Always consult a qualified dermatologist.</span>
+  </div>
+
+</div><!-- results -->
+
+<footer>
+  <p>DermaScan · Digital Image Processing Project</p>
+  <p>OpenCV · skimage · PyTorch · FastAPI</p>
+</footer>
+
+</div><!-- .page -->
+
+<script>
+const API = 'http://127.0.0.1:5000';
+let file=null,loaderTimer=null,loaderCur=0;
+
+function dz(e,on){e.preventDefault();document.getElementById('dropzone').classList[on?'add':'remove']('drag-over')}
+function handleDrop(e){
+  e.preventDefault();
+  document.getElementById('dropzone').classList.remove('drag-over');
+  const f=e.dataTransfer.files[0];
+  if(f&&f.type.startsWith('image/'))selectFile(f);
+}
+
+function selectFile(f){
+  file=f;
+  const url=URL.createObjectURL(f);
+  document.getElementById('dropInner').innerHTML=`
+    <div class="prev-wrap">
+      <img src="${url}" alt="preview"/>
+      <div class="prev-tag">${f.name} &nbsp;·&nbsp; ${(f.size/1024).toFixed(0)} KB</div>
+    </div>`;
+  document.getElementById('analyzeBtn').disabled=false;
+  document.getElementById('errBar').style.display='none';
+  document.getElementById('resultsWrap').style.display='none';
+}
+
+function resetAll(){
+  file=null;
+  document.getElementById('dropInner').innerHTML=`
+    <svg class="scope-ring" viewBox="0 0 112 112" fill="none">
+      <circle cx="56" cy="56" r="52" stroke="rgba(196,99,58,0.15)" stroke-width="1"/>
+      <circle cx="56" cy="56" r="46" stroke="var(--terra)" stroke-width="0.8" stroke-dasharray="4 7" opacity="0.4"/>
+      <line x1="56" y1="4" x2="56" y2="20" stroke="var(--terra)" stroke-width="1" opacity="0.5"/>
+      <line x1="56" y1="92" x2="56" y2="108" stroke="var(--terra)" stroke-width="1" opacity="0.5"/>
+      <line x1="4" y1="56" x2="20" y2="56" stroke="var(--terra)" stroke-width="1" opacity="0.5"/>
+      <line x1="92" y1="56" x2="108" y2="56" stroke="var(--terra)" stroke-width="1" opacity="0.5"/>
+      <circle cx="56" cy="56" r="28" stroke="rgba(196,99,58,0.12)" stroke-width="1"/>
+      <circle cx="56" cy="56" r="3" fill="var(--terra)" opacity="0.35"/>
+    </svg>
+    <div style="text-align:center">
+      <div class="drop-title">Drop your dermoscopic image</div>
+      <div class="drop-hint" style="margin-top:6px">click to browse · PNG · JPG · TIFF</div>
+    </div>`;
+  document.getElementById('analyzeBtn').disabled=true;
+  document.getElementById('errBar').style.display='none';
+  document.getElementById('resultsWrap').style.display='none';
+  document.getElementById('loaderWrap').style.display='none';
+}
+
+function startLoader(){
+  loaderCur=0;
+  for(let i=0;i<8;i++)document.getElementById('ls'+i).className='lstep';
+  document.getElementById('ls0').classList.add('active');
+  document.getElementById('loaderPct').textContent='0%';
+  document.getElementById('loaderWrap').style.display='block';
+  loaderTimer=setInterval(()=>{
+    document.getElementById('ls'+loaderCur).classList.replace('active','done');
+    loaderCur++;
+    document.getElementById('loaderPct').textContent=Math.round((loaderCur/8)*100)+'%';
+    if(loaderCur<8) document.getElementById('ls'+loaderCur).classList.add('active');
+    else clearInterval(loaderTimer);
+  },520);
+}
+function stopLoader(){
+  clearInterval(loaderTimer);
+  document.getElementById('loaderWrap').style.display='none';
+  for(let i=0;i<8;i++) document.getElementById('ls'+i).className='lstep';
+}
+
+async function analyze(){
+  if(!file)return;
+  document.getElementById('errBar').style.display='none';
+  document.getElementById('resultsWrap').style.display='none';
+  document.getElementById('analyzeBtn').disabled=true;
+  document.getElementById('analyzeBtn').innerHTML='<div class="spin-sm"></div>Analysing…';
+  startLoader();
+
+  const form=new FormData();form.append('image',file);
+  try{
+    const res=await fetch(`${API}/predict`,{method:'POST',body:form});
+    if(!res.ok){const t=await res.text();throw new Error(t||`Server ${res.status}`);}
+    const data=await res.json();
+    stopLoader();
+    render(data);
+  }catch(err){
+    stopLoader();
+    const eb=document.getElementById('errBar');
+    eb.textContent=err.message.includes('fetch')
+      ?'Cannot reach backend — ensure FastAPI is running at http://127.0.0.1:5000'
+      :err.message;
+    eb.style.display='block';
+  }finally{
+    document.getElementById('analyzeBtn').disabled=false;
+    document.getElementById('analyzeBtn').innerHTML=`
+      <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+        <circle cx="7.5" cy="7.5" r="6" stroke="currentColor" stroke-width="1.5"/>
+        <path d="M5 7.5l2 2 3-3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>Run Full DIP Analysis`;
+  }
+}
+
+function render(d){
+  const mal = d.is_malignant;
+  const conf = d.confidence || 0;
+
+  /* ───── Verdict ───── */
+  const vm = document.getElementById('verdMain');
+  vm.className = 'verdict-main ' + (mal ? 'verd-bad' : 'verd-good');
+
+  document.getElementById('verdEyebrow').textContent =
+    mal ? '⚠ Likely Malignant — consult a dermatologist' : '✓ Likely Benign';
+
+  document.getElementById('verdHeading').textContent =
+    mal ? 'Malignant Lesion' : 'Benign Lesion';
+
+  document.getElementById('verdClass').textContent =
+    'Classification: ' + (d.label || '').replace(/_/g, ' ');
+
+  /* ───── Confidence Ring ───── */
+  const circ = 2 * Math.PI * 36;
+  const fill = (conf / 100) * circ;
+
+  const cf = document.getElementById('cFill');
+  cf.style.stroke = mal ? 'var(--terra)' : 'var(--forest)';
+
+  setTimeout(() => {
+    cf.style.strokeDasharray = `${fill} ${circ}`;
+  }, 80);
+
+  document.getElementById('confNum').textContent = conf.toFixed(0) + '%';
+
+  /* ───── Images ───── */
+  const ir = document.getElementById('imgRow');
+
+  const panels = [
+    { n: '01', label: 'original',  color: 'var(--terra)',  b64: d.original_b64 },
+    { n: '02', label: 'segmented', color: 'var(--forest)', b64: d.segmented_b64 },
+    { n: '03', label: 'grad-cam',  color: 'var(--gold)',   b64: d.heatmap_b64 },
+  ];
+
+  ir.innerHTML = panels.map(p => `
+    <div class="img-tile">
+      <div class="img-viewport">
+        <img src="data:image/png;base64,${p.b64}" alt="${p.label}"/>
+      </div>
+      <div class="img-foot">
+        <span class="img-foot-n">${p.n}</span>
+        <span class="img-foot-name">${p.label}</span>
+        <span class="img-foot-dot" style="background:${p.color}"></span>
+      </div>
+    </div>
+  `).join('');
+
+  /* ───── ABCD ───── */
+  const f = d.features || {};
+
+  document.getElementById('abcdA').textContent =
+    f.asymmetry_score != null ? f.asymmetry_score.toFixed(3) : '—';
+
+  document.getElementById('abcdB').textContent =
+    f.compactness != null ? f.compactness.toFixed(3) : '—';
+
+  document.getElementById('abcdC').textContent =
+    f.hue_std != null ? f.hue_std.toFixed(2) : '—';
+
+  document.getElementById('abcdD').textContent =
+    f.lesion_area != null
+      ? Math.round(f.lesion_area).toLocaleString() + 'px'
+      : '—';
+
+  /* ───── Feature Grid ───── */
+  const items = [
+    { l: 'Lesion Area',     k: 'lesion_area',     u: 'px²',  mx: 20000 },
+    { l: 'Mean Intensity',  k: 'mean_intensity',  u: 'val',  mx: 255 },
+    { l: 'Std Deviation',   k: 'std_deviation',   u: 'val',  mx: 128 },
+    { l: 'Border Roughness',k: 'border_roughness',u: 'ratio',mx: 2 },
+    { l: 'GLCM Contrast',   k: 'glcm_contrast',   u: 'val',  mx: 100 },
+    { l: 'FFT Energy Ratio',k: 'fft_energy_ratio',u: 'ratio',mx: 1 },
+  ];
+
+  const fg = document.getElementById('featGrid');
+
+  fg.innerHTML = items.map(it => {
+    const v = f[it.k];
+    const disp = v != null
+      ? (Number.isInteger(v) ? v.toLocaleString() : parseFloat(v).toFixed(2))
+      : '—';
+
+    const pct = v != null
+      ? Math.min(100, (Math.abs(v) / it.mx) * 100).toFixed(0)
+      : 0;
+
+    return `
+      <div class="feat-tile">
+        <div class="feat-lbl">${it.l}</div>
+        <div class="feat-val">${disp}</div>
+        <div class="feat-unit">${it.u}</div>
+        <div class="feat-bar">
+          <div class="feat-fill" style="width:0%" data-w="${pct}"></div>
+        </div>
+      </div>`;
+  }).join('');
+
+  setTimeout(() => {
+    fg.querySelectorAll('.feat-fill').forEach(b => {
+      b.style.width = b.dataset.w + '%';
+    });
+  }, 200);
+
+  /* ───── Model Comparison (FIXED 🔥) ───── */
+  const mc = d.model_comparison || {};
+
+  const svm = mc.svm_confidence ?? null;
+  const rf  = mc.rf_confidence ?? null;
+  const dl  = conf;
+
+  document.getElementById('svmNum').textContent =
+    svm != null ? svm.toFixed(0) + '%' : '—';
+
+  document.getElementById('rfNum').textContent =
+    rf != null ? rf.toFixed(0) + '%' : '—';
+
+  document.getElementById('dlNum').textContent =
+    dl.toFixed(0) + '%';
+
+  // Remove previous winner
+  document.getElementById('svmTile').classList.remove('winner');
+  document.getElementById('rfTile').classList.remove('winner');
+  document.getElementById('dlTile').classList.remove('winner');
+
+  // Decide winner ONLY from available values
+  const values = [
+    { key: 'svmTile', val: svm },
+    { key: 'rfTile',  val: rf },
+    { key: 'dlTile',  val: dl }
+  ].filter(v => v.val != null);
+
+  if (values.length > 0) {
+    const winner = values.reduce((a, b) => a.val > b.val ? a : b);
+    document.getElementById(winner.key).classList.add('winner');
+  }
+
+  /* ───── Show Results ───── */
+  const rw = document.getElementById('resultsWrap');
+  rw.style.display = 'block';
+
+  setTimeout(() => {
+    rw.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 100);
+}
+</script>
+</body>
+</html>
